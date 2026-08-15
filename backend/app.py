@@ -101,6 +101,9 @@ def predict_sales():
     # Make prediction
     predicted_sales = saved_model.predict(input_data)[0]
 
+    # Convert NumPy float32 to a native Python float
+    predicted_sales = float(predicted_sales)
+
     # Return the predicted sales
     return jsonify({'Predicted Sales': predicted_sales})
 
@@ -116,22 +119,39 @@ def predict_sales_batch():
     # Get the uploaded CSV file from the request
     file = request.files['file']
 
-    # Read the CSV file into a Pandas DataFrame
+    # Read the uploaded CSV
     input_data = pd.read_csv(file)
 
-    # Make prediction
-    predicted_sales = saved_model.predict(input_data).tolist()
+    # Generate predictions and convert them to Python floats
+    predicted_sales = (
+        saved_model.predict(input_data)
+        .astype(float)
+        .tolist()
+    )
 
-    #Create output to add row id column and include input data in csv for reference
+    # Create output containing the original input data
     prediction_output = input_data.copy()
-    prediction_output.insert(0,"Batch_Row_Id",np.arange(1, len(input_data) + 1))
-    prediction_output["Predicted_Product_Store_Sales_Total"] = predicted_sales
-    
-    # Create a dictionary of predictions
-    output_dict = dict(prediction_output)
 
-    # Return the predictions dictionary as a JSON response
-    return output_dict
+    # Add a generated row identifier
+    prediction_output.insert(
+        0,
+        "Batch_Row_Id",
+        np.arange(1, len(input_data) + 1)
+    )
+
+    # Add predictions
+    prediction_output[
+        "Predicted_Product_Store_Sales_Total"
+    ] = predicted_sales
+
+    # Convert the DataFrame to JSON-compatible row records
+    output_records = prediction_output.to_dict(
+        orient="records"
+    )
+
+    return jsonify({
+        "predictions": output_records
+    })
 
 # Run the Flask application in debug mode if this script is executed directly
 if __name__ == '__main__':
