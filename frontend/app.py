@@ -17,7 +17,7 @@ Product_Weight = st.number_input("Product Weight (in decimal format)", min_value
 Product_Sugar_Content = st.selectbox("Product Sugar Content", ["No Sugar", "Low Sugar", "Regular"])
 Product_Allocated_Area = st.number_input("Allocated Store Display Area (as percent of total store display area, in decimal format)", min_value=0.001, max_value=0.50, value=.06)
 Product_Type = st.selectbox("Product Type", ["Fruits and Vegetables", "Snack Foods", "Frozen Foods", "Dairy", "Household", "Baking Goods", "Canned", "Health and Hygiene", "Meat", "Soft Drinks", "Breads", "Hard Drinks", "Others", "Starchy Foods", "Breakfast", "Seafood"])
-Product_MRP = st.number_input("Product Retail Price", min_value=1.0, max_value=500.0, value=150)
+Product_MRP = st.number_input("Product Retail Price", min_value=1.00, max_value=500.00, value=150.00)
 Store_Size = st.selectbox("Store Size", ["Small", "Medium","High"])
 Store_Location_City_Type = st.selectbox("Store Location Standard of Living Tier", ["Tier 1", "Tier 2","Tier 3"])
 Store_Type = st.selectbox("Store Type", ["Supermarket Type2", "Supermarket Type1","Departmental Store","Food Mart"])
