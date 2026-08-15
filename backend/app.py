@@ -53,6 +53,68 @@ def assign_mrp_band(product_mrp):
 
     return str(mrp_band)
 
+REQUIRED_RAW_COLUMNS = [
+    "Product_Weight",
+    "Product_Sugar_Content",
+    "Product_Allocated_Area",
+    "Product_Type",
+    "Product_MRP",
+    "Store_Size",
+    "Store_Location_City_Type",
+    "Store_Type"
+]
+
+
+def add_engineered_features(data):
+    """
+    Validate the raw input data and create the engineered features
+    expected by the saved model pipeline.
+    """
+
+    model_data = data.copy()
+
+    missing_columns = [
+        column
+        for column in REQUIRED_RAW_COLUMNS
+        if column not in model_data.columns
+    ]
+
+    if missing_columns:
+        raise ValueError(
+            f"Uploaded CSV is missing required columns: "
+            f"{missing_columns}"
+        )
+
+    # Ensure the source columns are numerical
+    model_data["Product_MRP"] = pd.to_numeric(
+        model_data["Product_MRP"],
+        errors="raise"
+    )
+
+    model_data["Product_Allocated_Area"] = pd.to_numeric(
+        model_data["Product_Allocated_Area"],
+        errors="raise"
+    )
+
+    model_data["Product_Weight"] = pd.to_numeric(
+        model_data["Product_Weight"],
+        errors="raise"
+    )
+
+    # Engineer MRP and allocated-area interaction
+    model_data["MRP_x_Allocated_Area"] = (
+        model_data["Product_MRP"]
+        * model_data["Product_Allocated_Area"]
+    )
+
+    # Apply the same MRP band function used for single predictions
+    model_data["Product_MRP_Band"] = (
+        model_data["Product_MRP"]
+        .apply(assign_mrp_band)
+    )
+
+    return model_data
+
 # Define a route for the home page (GET request)
 @superkart_sales_prediction_api.get('/')
 def home():
@@ -116,42 +178,68 @@ def predict_sales_batch():
     It expects a CSV file containing product details for multiple stores
     and returns the predicted sales as a dictionary in the JSON response.
     """
-    # Get the uploaded CSV file from the request
-    file = request.files['file']
+    
+    if "file" not in request.files:
+        return jsonify({
+            "error": "No CSV file was provided."
+        }), 400
 
-    # Read the uploaded CSV
-    input_data = pd.read_csv(file)
+    file = request.files["file"]
 
-    # Generate predictions and convert them to Python floats
-    predicted_sales = (
-        saved_model.predict(input_data)
-        .astype(float)
-        .tolist()
-    )
+    if file.filename == "":
+        return jsonify({
+            "error": "No CSV file was selected."
+        }), 400
 
-    # Create output containing the original input data
-    prediction_output = input_data.copy()
+    try:
+        # Read the uploaded CSV
+        input_data = pd.read_csv(file)
 
-    # Add a generated row identifier
-    prediction_output.insert(
-        0,
-        "Batch_Row_Id",
-        np.arange(1, len(input_data) + 1)
-    )
+        # Add the engineered features expected by the model
+        model_input = add_engineered_features(input_data)
 
-    # Add predictions
-    prediction_output[
-        "Predicted_Product_Store_Sales_Total"
-    ] = predicted_sales
+        # Generate predictions and convert to Python floats
+        predicted_sales = (
+            saved_model.predict(model_input)
+            .astype(float)
+            .tolist()
+        )
 
-    # Convert the DataFrame to JSON-compatible row records
-    output_records = prediction_output.to_dict(
-        orient="records"
-    )
+        # Create output containing the original input fields
+        prediction_output = input_data.copy()
 
-    return jsonify({
-        "predictions": output_records
-    })
+        # Add a generated batch row identifier
+        prediction_output.insert(
+            0,
+            "Batch_Row_Id",
+            np.arange(1, len(input_data) + 1)
+        )
+
+        # Add the predictions
+        prediction_output[
+            "Predicted_Product_Store_Sales_Total"
+        ] = predicted_sales
+
+        # Convert each column to a JSON-compatible list
+        output_dict = prediction_output.to_dict(
+            orient="list"
+        )
+
+        return jsonify(output_dict)
+
+    except ValueError as error:
+        return jsonify({
+            "error": str(error)
+        }), 400
+
+    except Exception as error:
+        superkart_sales_prediction_api.logger.exception(
+            "Batch prediction failed"
+        )
+
+        return jsonify({
+            "error": str(error)
+        }), 500
 
 # Run the Flask application in debug mode if this script is executed directly
 if __name__ == '__main__':
