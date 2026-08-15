@@ -1,4 +1,5 @@
 # Import necessary libraries
+from pathlib import Path
 import numpy as np
 import joblib  # For loading the serialized model
 import pandas as pd  # For data manipulation
@@ -6,6 +7,22 @@ from flask import Flask, request, jsonify  # For creating the Flask API
 
 # Initialize the Flask application
 superkart_sales_prediction_api = Flask("SuperKart Sales Predictor")
+
+# Locate the model relative to this app.py file
+BACKEND_DIRECTORY = Path(__file__).resolve().parent
+
+MODEL_PATH = (
+    BACKEND_DIRECTORY
+    / "superkart_sales_prediction_model_v1_0.joblib"
+)
+
+if not MODEL_PATH.exists():
+    raise FileNotFoundError(
+        f"Saved model file was not found at: {MODEL_PATH}"
+    )
+
+# Load the fitted preprocessing and model pipeline once at startup
+saved_model = joblib.load(MODEL_PATH)
 
 #defining function for engineered features to calculate based on user input
 MRP_BOUNDARIES = [
