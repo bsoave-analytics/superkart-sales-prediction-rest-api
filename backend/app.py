@@ -7,6 +7,35 @@ from flask import Flask, request, jsonify  # For creating the Flask API
 # Initialize the Flask application
 superkart_sales_prediction_api = Flask("SuperKart Sales Predictor")
 
+#defining function for engineered features to calculate based on user input
+MRP_BOUNDARIES = [
+    -np.inf,
+    126.00, #training Q1 boundary
+    147.00, #training median boundary
+    168.00, #training Q3 boundary
+    np.inf
+]
+
+MRP_LABELS = [
+    "Low",
+    "Medium",
+    "High",
+    "Premium"
+]
+
+
+def assign_mrp_band(product_mrp):
+    """Assign an MRP band using the training-data boundaries."""
+
+    mrp_band = pd.cut(
+        pd.Series([product_mrp]),
+        bins=MRP_BOUNDARIES,
+        labels=MRP_LABELS,
+        include_lowest=True
+    ).iloc[0]
+
+    return str(mrp_band)
+
 # Define a route for the home page (GET request)
 @superkart_sales_prediction_api.get('/')
 def home():
